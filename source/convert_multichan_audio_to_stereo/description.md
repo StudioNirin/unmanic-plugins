@@ -17,7 +17,6 @@ This Plugin uses 64k per audio channel, so 128 kbps for stereo.
 Over time this plugin has added more features.  It now also:
 - optionally deletes the multichannel stream from the file
 - allows the stereo stream(s) to be marked as the default audio stream(s).
-- requires you to specify a language for the stereo stream(s) when marking the stereo stream(s) as default.
 - allows all other, non-aac encoded streams to be encoded with the selected aac encoder. 
 
 In above, stream is written optionally as stream(s) in the event there are multiple stereo audio streams
@@ -25,9 +24,7 @@ of the same language.  In this case, multiple streams could be marked as default
 a particular media player selects as default may vary.
 
 If there are no multichannel streams in the file or none identified, the plugin will convert all audio streams to aac if the
-option encode_all_2_aac is selected. In this case, if the option set_2ch_stream_as_default is also selected, the plugin will
-look for an existing stream (of any number of channels) with a langauge matching the supplied language and set it's default
-disposition to true. 
+option encode_all_2_aac is selected. 
 ---
 
 ##### Documentation:
@@ -52,10 +49,6 @@ Keeps multichannel stream in the resulting file in addition to stereo stream der
 
 #### <span style="color:blue">set_2ch_stream_as_default</span>
 Sets the 2 channel stream to be the default stream
-
-#### <span style="color:blue">default_lang</span>
-if the preceeding option is selected, this option becomes visible and you must indicate a language of an existing multichannel stream which, when converted to
-2channel, will marked as a default audio stream
 
 #### <span style="color:blue">normalize_2_channel_stream</span>
 selecting this option will apply a normalization filter to the 2 channel aac streams.  This is useful when converting multichannel to 2 channel as what is
