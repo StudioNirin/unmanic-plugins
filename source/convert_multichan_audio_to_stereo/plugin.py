@@ -251,6 +251,9 @@ def on_worker_process(data):
         ]
         for disp_key, disp_val in existing_dispositions[abs_stream].items():
             if disp_val:
+                # If set_2ch_stream_as_default is True, remove default from multichannel tracks
+                if defaudio2ch and disp_key == "default" and chnls > 2:
+                    continue
                 ffmpeg_args += [f'-disposition:a:{next_audio_stream_index}', disp_key]
         next_audio_stream_index += 1
 
