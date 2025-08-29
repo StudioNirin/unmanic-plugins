@@ -244,20 +244,24 @@ def on_worker_process(data):
         s = probe_streams[abs_stream]
         chnls = s.get('channels', 0)
 
-        # Keep original
+        # Copy original stream
         ffmpeg_args += [
             '-map', f'0:{abs_stream}',
             f'-c:a:{next_audio_stream_index}', 'copy'
         ]
+
+        # Copy dispositions, but remove default if we want stereo to be default
         for disp_key, disp_val in existing_dispositions[abs_stream].items():
             if disp_val:
-                # If set_2ch_stream_as_default is True, remove default from multichannel tracks
-                if defaudio2ch and disp_key == "default" and chnls > 2:
-                    continue
-                ffmpeg_args += [f'-disposition:a:{next_audio_stream_index}', disp_key]
+                if defaudio2ch and disp_key == 'default':
+                    # strip default from originals
+                    ffmpeg_args += [f'-disposition:a:{next_audio_stream_index}', '0']
+                else:
+                    ffmpeg_args += [f'-disposition:a:{next_audio_stream_index}', disp_key]
+
         next_audio_stream_index += 1
 
-        # Add stereo if multichannel
+        # Add stereo track if multichannel
         if abs_stream in streams:
             rate = '128k'
             if 'bit_rate' in s:
@@ -267,13 +271,8 @@ def on_worker_process(data):
             if normalize_2_channel_stream:
                 filter_args = [f"-filter:a:{next_audio_stream_index}", audio_filtergraph(settings)]
 
-            # Title logic
             orig_title = s['tags'].get('title')
-            lang = s['tags'].get('language', 'und').title()
-            if orig_title:
-                new_title = f"{orig_title} - 2.0"
-            else:
-                new_title = f"Stereo"
+            new_title = f"{orig_title} - 2.0" if orig_title else "Stereo"
 
             ffmpeg_args += [
                 '-map', f'0:{abs_stream}',
@@ -283,6 +282,7 @@ def on_worker_process(data):
                 f'-metadata:s:a:{next_audio_stream_index}', f"title={new_title}"
             ] + filter_args
 
+            # Assign default to all new stereo tracks
             if defaudio2ch:
                 ffmpeg_args += [f'-disposition:a:{next_audio_stream_index}', 'default']
 
