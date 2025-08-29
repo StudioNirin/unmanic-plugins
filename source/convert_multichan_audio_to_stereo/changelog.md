@@ -1,4 +1,8 @@
-**<span style="color:#56adda">0.0.6</span>**
+**<span style="color:#56adda">0.0.7</span>**
+- Fixed 'Stereo as default track' option.
+- Removed option to order tracks by language. 
+
+**<span style="color:#56adda">0.0.4</span>**
 - Fixing the 'Stereo as default track' option.
 
 **<span style="color:#56adda">0.0.3</span>**
