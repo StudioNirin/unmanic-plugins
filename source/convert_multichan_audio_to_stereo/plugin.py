@@ -38,7 +38,6 @@ class Settings(PluginSettings):
         "encode_all_2_aac":          True,
         "keep_mc":                   True,
         "set_2ch_stream_as_default": False,
-        "default_lang":              "",
         "normalize_2_channel_stream": True,
         'I':                         '-16.0',
         'LRA':                       '11.0',
@@ -58,9 +57,8 @@ class Settings(PluginSettings):
                 "label": "uncheck to delete the multichannel streams after they are remixed to stereo",
             },
             "set_2ch_stream_as_default": {
-                "label": "check to set the default audio stream as a new 2 channel stream OR an existing audio stream if file contains no multichannel streams and you wish to designate a specific language stream as the default audio stream",
+                "label": "check to set the default audio stream as the new 2 channel stream.",
             },
-            "default_lang": self.__set_default_lang_form_settings(),
             "normalize_2_channel_stream": {
                 "label": "check this to normalize the resulting 2 channel audio stream - customizeable settings will appear below when checked",
             },
@@ -68,15 +66,6 @@ class Settings(PluginSettings):
             "LRA": self.__set_LRA_form_settings(),
             "TP": self.__set_TP_form_settings(),
         }
-
-    def __set_default_lang_form_settings(self):
-        values = {
-            "label": "A single language of an existing stream to use as default audio stream per above - it's probably 3 letters",
-            "input_type": "textarea",
-        }
-        if not self.get_setting('set_2ch_stream_as_default'):
-            values["display"] = 'hidden'
-        return values
 
     def __set_I_form_settings(self):
         values = {
@@ -211,7 +200,6 @@ def on_worker_process(data):
     settings = Settings(library_id=data.get('library_id')) if data.get('library_id') else Settings()
     keep_mc = settings.get_setting('keep_mc')
     defaudio2ch = settings.get_setting('set_2ch_stream_as_default')
-    def2chlang = settings.get_setting('default_lang')
     encode_all_2_aac = settings.get_setting('encode_all_2_aac')
     normalize_2_channel_stream = settings.get_setting('normalize_2_channel_stream')
     encoder = 'libfdk_aac' if settings.get_setting('use_libfdk_aac') else 'aac'
