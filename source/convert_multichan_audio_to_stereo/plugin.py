@@ -283,7 +283,7 @@ def on_worker_process(data):
                 f'-metadata:s:a:{next_audio_stream_index}', f"title={new_title}"
             ] + filter_args
 
-            if defaudio2ch and s.get('tags', {}).get('language') == def2chlang:
+            if defaudio2ch:
                 ffmpeg_args += [f'-disposition:a:{next_audio_stream_index}', 'default']
 
             next_audio_stream_index += 1
