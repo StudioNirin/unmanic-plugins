@@ -1,4 +1,4 @@
-**<span style="color:#56adda">0.0.4</span>**
+**<span style="color:#56adda">0.0.6</span>**
 - Fixing the 'Stereo as default track' option.
 
 **<span style="color:#56adda">0.0.3</span>**
