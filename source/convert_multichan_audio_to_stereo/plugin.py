@@ -22,8 +22,6 @@
 
 """
 import logging
-import os
-
 from unmanic.libs.unplugins.settings import PluginSettings
 from convert_multichan_audio_to_stereo.lib.ffmpeg import Probe, Parser
 
@@ -39,14 +37,14 @@ def has_stereo_track(probe_streams):
 
 class Settings(PluginSettings):
     settings = {
-        "use_libfdk_aac":            True,
-        "encode_all_2_aac":          True,
-        "keep_mc":                   True,
+        "use_libfdk_aac": True,
+        "encode_all_2_aac": True,
+        "keep_mc": True,
         "set_2ch_stream_as_default": False,
         "normalize_2_channel_stream": True,
-        'I':                         '-16.0',
-        'LRA':                       '11.0',
-        'TP':                        '-1.5',
+        'I': '-16.0',
+        'LRA': '11.0',
+        'TP': '-1.5',
     }
 
     def __init__(self, *args, **kwargs):
@@ -167,29 +165,29 @@ def on_worker_process(data):
 
     for s in probe_streams:
         idx = s['index']
-        chnls = s.get('channels', 0)
+        chnls = s.get('channels', 2)
 
-        # Determine codec
+        # Set codec
+        codec = encoder if idx in streams_to_aac else 'copy'
+
+        # 64k per channel
         if idx in streams_to_aac:
-            codec = encoder
-            # Compute sensible bitrate
-            bitrate = max(128000, s.get('bit_rate', 192000))
+            bitrate = 64000 * chnls
             rate = str(int(bitrate / 1000)) + 'k'
         else:
-            codec = 'copy'
             rate = None
 
         ffmpeg_args += ['-map', f'0:{idx}', f'-c:a:{next_audio_stream_index}', codec]
         if rate:
             ffmpeg_args += [f'-b:a:{next_audio_stream_index}', rate]
 
-        # Downmix only if no existing stereo
+        # Downmix if needed
         if idx in streams_to_downmix:
-            ffmpeg_args += ['-ac:a:{0}'.format(next_audio_stream_index), '2', f'-metadata:s:a:{next_audio_stream_index}', 'title=Stereo']
+            ffmpeg_args += [f'-ac:a:{next_audio_stream_index}', '2', f'-metadata:s:a:{next_audio_stream_index}', 'title=Stereo']
             if normalize_2_channel_stream:
                 ffmpeg_args += [f'-filter:a:{next_audio_stream_index}', audio_filtergraph(settings)]
 
-        # Handle dispositions
+        # Dispositions
         for disp_key, disp_val in existing_dispositions[idx].items():
             if disp_val:
                 if defaudio2ch and idx in streams_to_downmix and disp_key == 'default':
