@@ -348,10 +348,9 @@ def stream_iterator(mapper, stream_list, streams, codec):
                 mapadder(mapper, i, codec)
 
 def mapadder(mapper, stream, codec):
-    """Add a stream to ffmpeg mapping while preserving all original dispositions and preventing unwanted default flags."""
-    mapper.stream_mapping += ['-map', f'0:{codec}:{stream}']
+    """Add a stream to ffmpeg mapping while preserving original dispositions and preventing unintended default flags."""
+    mapper.stream_mapping += ['-map', f'0:{stream}']
 
-    # Get original disposition from probe
     try:
         disp = mapper.probe_streams[stream].get('disposition', {})
     except Exception:
@@ -363,57 +362,29 @@ def mapadder(mapper, stream, codec):
     if disp.get('forced', 0) == 1:
         flags.append('forced')
 
-    # Special handling for subtitles: prevent FFmpeg auto-promotion
+    # Subtitles: only set default if it was originally set
     if codec == 's':
-        if not flags:
-            # Explicitly remove default and forced
-            flags.append('default-')
-        # if only forced is set, make sure default is removed
-        if 'forced' in flags and 'default' not in flags:
+        if 'default' not in flags:
             flags.append('default-')
 
-    # For audio, set 'none' if no disposition is needed
+    # Audio: no special handling, keep dispositions
     if codec != 's' and not flags:
         flags.append('none')
 
     mapper.stream_encoding += [f'-disposition:{codec}:{stream}', '+'.join(flags)]
-
-    # Copy codec
     mapper.stream_encoding += [f'-c:{codec}:{stream}', 'copy']
 
-
 def on_worker_process(data):
-    """
-    Runner function - enables additional configured processing jobs during the worker stages of a task.
-
-    The 'data' object argument includes:
-        exec_command            - A command that Unmanic should execute. Can be empty.
-        command_progress_parser - A function that Unmanic can use to parse the STDOUT of the command to collect progress stats. Can be empty.
-        file_in                 - The source file to be processed by the command.
-        file_out                - The destination that the command should output (may be the same as the file_in if necessary).
-        original_file_path      - The absolute path to the original file.
-        repeat                  - Boolean, should this runner be executed again once completed with the same variables.
-
-    :param data:
-    :return:
-
-    """
-    # Default to no FFMPEG command required. This prevents the FFMPEG command from running if it is not required
     data['exec_command'] = []
     data['repeat'] = False
-
-    # Get the path to the file
     abspath = data.get('file_in')
 
-    # Get file probe
     probe = Probe(logger, allowed_mimetypes=['video'])
     if not probe.file(abspath):
-        # File probe failed, skip the rest of this test
         return data
-    else:
-        probe_streams = probe.get_probe()["streams"]
 
-    # Configure settings object (maintain compatibility with v1 plugins)
+    probe_streams = probe.get_probe()["streams"]
+
     if data.get('library_id'):
         settings = Settings(library_id=data.get('library_id'))
     else:
@@ -422,40 +393,34 @@ def on_worker_process(data):
     keep_undefined_lang_tags = settings.get_setting('keep_undefined')
     keep_commentary = settings.get_setting('keep_commentary')
 
-    if not file_streams_already_kept(settings, data.get('file_in')):
-        # Get stream mapper
+    if not file_streams_already_kept(settings, abspath):
         mapper = PluginStreamMapper()
         mapper.set_settings(settings)
         mapper.set_probe(probe)
-
-        # Set the input file
         mapper.set_input_file(abspath)
-
-        # Get fail-safe setting
         fail_safe = settings.get_setting('fail_safe')
 
-        # Test for null intersection of configured languages and actual languages
         if fail_safe:
             if not mapper.null_streams(probe_streams):
-                logger.info("File '{}' does not contain streams matching any of the configured languages - if * was configured or the file has no streams of a given type, this check will not prevent the plugin from running for that strem type.".format(abspath))
+                logger.info(f"File '{abspath}' has no matching streams, skipping.")
                 return data
+
         if mapper.same_streams_or_no_work(probe_streams, keep_undefined_lang_tags):
-            logger.debug("File '{}' only has same streams as keep configuration specifies OR otherwise does not require any work to keep ony specified streams - so, does not contain streams that require processing.".format(abspath))
+            logger.debug(f"File '{abspath}' requires no processing.")
         elif mapper.streams_need_processing():
-            logger.debug("File '{}' Proceeding with worker - probe found streams require processing.".format(abspath))
-            # Set the output file
+            logger.debug(f"Processing '{abspath}', streams require keeping.")
             mapper.set_output_file(data.get('file_out'))
 
-            # clear stream mappings, copy all video
+            # Clear mappings, always keep video
             mapper.stream_mapping = ['-map', '0:v']
             mapper.stream_encoding = []
 
-            # keep specific language streams if present
+            # Keep specific audio & subtitle languages
             keep_languages(mapper, 'audio', settings.get_setting('audio_languages'), probe_streams, keep_undefined_lang_tags, keep_commentary)
             if settings.get_setting('subtitle_languages') != '*':
                 keep_languages(mapper, 'subtitle', settings.get_setting('subtitle_languages'), probe_streams, keep_undefined_lang_tags, keep_commentary)
 
-            # keep undefined language streams if present
+            # Keep undefined language streams if requested
             if keep_undefined_lang_tags:
                 keep_undefined(mapper, probe_streams, keep_commentary)
 
