@@ -12,7 +12,7 @@
         "all"
     ],
     "priorities": {
-        "on_library_management_file_test": 99,
+        "on_library_management_file_test": 1,
         "on_worker_process": 1
     },
     "tags": "audio,subtitle, ffmpeg,library file test",
