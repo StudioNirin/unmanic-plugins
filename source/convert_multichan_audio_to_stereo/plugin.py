@@ -25,7 +25,6 @@ import logging
 import os
 
 from unmanic.libs.unplugins.settings import PluginSettings
-
 from convert_multichan_audio_to_stereo.lib.ffmpeg import Probe, Parser
 
 # Configure plugin logger
@@ -132,7 +131,7 @@ def streams_to_stereo_encode(probe_streams):
     for s in probe_streams:
         if s['codec_type'] == 'audio' and s.get('channels', 0) > 2:
             if 'tags' in s and 'language' in s['tags'] and s['tags']['language'] not in stereo_streams:
-                streams.append(s['index'])  # absolute input index
+                streams.append(s['index'])
 
     return streams
 
@@ -161,27 +160,20 @@ def on_library_management_file_test(data):
         data['add_file_to_pending_tasks'] = False
         return data
 
-    if data.get('library_id'):
-        settings = Settings(library_id=data.get('library_id'))
-    else:
-        settings = Settings()
+    settings = Settings(library_id=data.get('library_id')) if data.get('library_id') else Settings()
 
-    # Early exit if stereo already exists
+    # Determine which streams need processing
     if has_stereo_track(probe_streams):
         logger.debug(f"File '{abspath}' already has a stereo track - only re-encode to AAC if required.")
-        streams = []
+        streams_to_downmix = []
     else:
-        streams = streams_to_stereo_encode(probe_streams)
+        streams_to_downmix = streams_to_stereo_encode(probe_streams)
 
-    encode_all_2_aac = settings.get_setting('encode_all_2_aac')
-    keep_mc = settings.get_setting('keep_mc')
-    streams_2_aac_encode = []
-    if encode_all_2_aac:
-        streams_2_aac_encode = streams_to_aac_encode(probe_streams, streams, keep_mc)
+    streams_to_aac_encode_list = streams_to_aac_encode(probe_streams, streams_to_downmix, settings.get_setting('keep_mc')) if settings.get_setting('encode_all_2_aac') else []
 
-    if streams or streams_2_aac_encode:
+    if streams_to_downmix or streams_to_aac_encode_list:
         data['add_file_to_pending_tasks'] = True
-        for stream in streams:
+        for stream in streams_to_downmix:
             logger.debug("Audio stream '{}' is multichannel audio - convert stream".format(stream))
     else:
         logger.debug("do not add file '{}' to task list - no multichannel audio streams".format(abspath))
@@ -217,23 +209,13 @@ def on_worker_process(data):
     encode_all_2_aac = settings.get_setting('encode_all_2_aac')
     normalize_2_channel_stream = settings.get_setting('normalize_2_channel_stream')
     encoder = 'libfdk_aac' if settings.get_setting('use_libfdk_aac') else 'aac'
-    copy_enc = encoder if encode_all_2_aac else 'copy'
 
-    # Identify streams, skip stereo creation if already present
-    if has_stereo_track(probe_streams):
-        logger.debug(f"File '{abspath}' already has a stereo track - skipping stereo creation")
-        streams = []
-    else:
-        streams = streams_to_stereo_encode(probe_streams)
+    # Determine streams
+    streams_to_downmix = [] if has_stereo_track(probe_streams) else streams_to_stereo_encode(probe_streams)
+    streams_to_aac = [s['index'] for s in probe_streams if s['codec_type'] == 'audio' and s['codec_name'] != 'aac'] if encode_all_2_aac else []
 
-    streams_2_aac_encode = streams_to_aac_encode(probe_streams, streams, keep_mc) if encode_all_2_aac else []
-    all_astreams = [s['index'] for s in probe_streams if s['codec_type'] == 'audio']
-
-    logger.debug(f"streams to downmix: {streams}")
-    logger.debug(f"all audio streams: {all_astreams}")
-
-    if not streams and not streams_2_aac_encode:
-        logger.debug(f"do not add file '{abspath}' to task list - no multichannel audio streams")
+    if not streams_to_downmix and not streams_to_aac:
+        logger.debug(f"do not add file '{abspath}' to task list - no audio streams to process")
         return data
 
     # Preserve dispositions
@@ -246,75 +228,38 @@ def on_worker_process(data):
     ]
 
     next_audio_stream_index = 0
-
-    for abs_stream in all_astreams:
-        s = probe_streams[abs_stream]
+    for s in probe_streams:
+        idx = s['index']
         chnls = s.get('channels', 0)
 
-        # Copy original stream
+        # Determine codec
+        codec = encoder if idx in streams_to_aac else 'copy'
+
         ffmpeg_args += [
-            '-map', f'0:{abs_stream}',
-            f'-c:a:{next_audio_stream_index}', 'copy'
+            '-map', f'0:{idx}',
+            f'-c:a:{next_audio_stream_index}', codec
         ]
 
-        # Copy dispositions, but remove default if we want stereo to be default
-        for disp_key, disp_val in existing_dispositions[abs_stream].items():
+        # Downmix if necessary
+        if idx in streams_to_downmix:
+            ffmpeg_args += [
+                f'-ac:a:{next_audio_stream_index}', '2',
+                f'-metadata:s:a:{next_audio_stream_index}', 'title=Stereo'
+            ]
+            if normalize_2_channel_stream:
+                ffmpeg_args += [f"-filter:a:{next_audio_stream_index}", audio_filtergraph(settings)]
+
+        # Apply dispositions
+        for disp_key, disp_val in existing_dispositions[idx].items():
             if disp_val:
-                if defaudio2ch and disp_key == 'default':
-                    # strip default from originals
+                if defaudio2ch and idx in streams_to_downmix and disp_key == 'default':
                     ffmpeg_args += [f'-disposition:a:{next_audio_stream_index}', '0']
                 else:
                     ffmpeg_args += [f'-disposition:a:{next_audio_stream_index}', disp_key]
 
-        next_audio_stream_index += 1
+        if defaudio2ch and idx in streams_to_downmix:
+            ffmpeg_args += [f'-disposition:a:{next_audio_stream_index}', 'default']
 
-        # Add stereo track if multichannel
-        if abs_stream in streams:
-            rate = '128k'
-            if 'bit_rate' in s:
-                rate = str(int(int(s['bit_rate']) / (1000 * max(chnls, 1))) * 2) + 'k'
-
-            filter_args = []
-            if normalize_2_channel_stream:
-                filter_args = [f"-filter:a:{next_audio_stream_index}", audio_filtergraph(settings)]
-
-            orig_title = s['tags'].get('title')
-            new_title = f"{orig_title} - 2.0" if orig_title else "Stereo"
-
-            ffmpeg_args += [
-                '-map', f'0:{abs_stream}',
-                f'-c:a:{next_audio_stream_index}', encoder,
-                f'-ac:a:{next_audio_stream_index}', '2',
-                f'-b:a:{next_audio_stream_index}', rate,
-                f'-metadata:s:a:{next_audio_stream_index}', f"title={new_title}"
-            ] + filter_args
-
-            # Assign default to all new stereo tracks
-            if defaudio2ch:
-                ffmpeg_args += [f'-disposition:a:{next_audio_stream_index}', 'default']
-
-            next_audio_stream_index += 1
-
-    # Encode any extra 2ch tracks if requested
-    for abs_stream in streams_2_aac_encode:
-        if abs_stream in streams:
-            continue
-        s = probe_streams[abs_stream]
-        chnls = s.get('channels', 0)
-        rate = '128k'
-        if 'bit_rate' in s:
-            rate = str(int(int(s['bit_rate']) / (1000 * max(chnls, 1))) * 2) + 'k'
-
-        filter_args = []
-        if normalize_2_channel_stream:
-            filter_args = [f"-filter:a:{next_audio_stream_index}", audio_filtergraph(settings)]
-
-        ffmpeg_args += [
-            '-map', f'0:{abs_stream}',
-            f'-c:a:{next_audio_stream_index}', encoder,
-            f'-ac:a:{next_audio_stream_index}', '2',
-            f'-b:a:{next_audio_stream_index}', rate
-        ] + filter_args
         next_audio_stream_index += 1
 
     # Map subtitles/data/attachments
