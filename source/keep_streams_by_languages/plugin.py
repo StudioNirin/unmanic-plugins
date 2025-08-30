@@ -210,11 +210,23 @@ def kept_streams(settings):
 
     return 'kept_streams=audio_langauges={}:subtitle_languages={}:keep_undefined={}:keep_commentary={}:fail_safe={}'.format(al, sl, ku, kc, fs)
 
-
-"""
-This little bit is a remnant of the old need for the .unmanic file. Leaving it here while I test things. 
-"""
 def file_streams_already_kept(settings, path):
+    directory_info = UnmanicDirectoryInfo(os.path.dirname(path))
+
+    try:
+        streams_already_kept = directory_info.get('keep_streams_by_languages', os.path.basename(path))
+    except NoSectionError as e:
+        streams_already_kept = ''
+    except NoOptionError as e:
+        streams_already_kept = ''
+    except Exception as e:
+        logger.debug("Unknown exception {}.".format(e))
+        streams_already_kept = ''
+
+    if streams_already_kept:
+        logger.debug("File's streams were previously kept with {}.".format(streams_already_kept))
+        return True
+
     # Default to...
     return False
 
@@ -267,7 +279,7 @@ def on_library_management_file_test(data):
     keep_undefined = settings.get_setting('keep_undefined')
 
     if not file_streams_already_kept(settings, abspath):
-        logger.debug("File '{}' has not previously had streams kept by keep_streams_by_language plugin".format(abspath))
+        logger.debug("File '{}' has not previously had streams kept by keep_streams_by_languages plugin".format(abspath))
         if fail_safe:
             if not mapper.null_streams(probe_streams):
                 logger.debug("File '{}' does not contain streams matching any of the configured languages - if * was configured or the file has no streams of a given type, this check will not prevent the plugin from running for that strem type.".format(abspath))
@@ -464,5 +476,12 @@ def on_postprocessor_task_results(data):
         settings = Settings(library_id=data.get('library_id'))
     else:
         settings = Settings()
-
+""" Skippping creating an .unmanic file
+    # Loop over the destination_files list and update the directory info file for each one
+    for destination_file in data.get('destination_files'):
+        directory_info = UnmanicDirectoryInfo(os.path.dirname(destination_file))
+        directory_info.set('keep_streams_by_languages', os.path.basename(destination_file), kept_streams(settings))
+        directory_info.save()
+        logger.debug("Keep streams by language already processed for '{}'.".format(destination_file))
+"""
     return data
