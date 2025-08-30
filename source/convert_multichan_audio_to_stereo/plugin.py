@@ -32,6 +32,14 @@ from convert_multichan_audio_to_stereo.lib.ffmpeg import Probe, Parser
 logger = logging.getLogger("Unmanic.Plugin.convert_multichan_audio_to_stereo")
 
 
+def has_stereo_track(probe_streams):
+    """Return True if any existing stereo audio track is present."""
+    return any(
+        s['codec_type'] == 'audio' and s.get('channels', 0) == 2
+        for s in probe_streams
+    )
+
+
 class Settings(PluginSettings):
     settings = {
         "use_libfdk_aac":            True,
@@ -158,7 +166,13 @@ def on_library_management_file_test(data):
     else:
         settings = Settings()
 
-    streams = streams_to_stereo_encode(probe_streams)
+    # Early exit if stereo already exists
+    if has_stereo_track(probe_streams):
+        logger.debug(f"File '{abspath}' already has a stereo track - only re-encode to AAC if required.")
+        streams = []
+    else:
+        streams = streams_to_stereo_encode(probe_streams)
+
     encode_all_2_aac = settings.get_setting('encode_all_2_aac')
     keep_mc = settings.get_setting('keep_mc')
     streams_2_aac_encode = []
@@ -205,8 +219,13 @@ def on_worker_process(data):
     encoder = 'libfdk_aac' if settings.get_setting('use_libfdk_aac') else 'aac'
     copy_enc = encoder if encode_all_2_aac else 'copy'
 
-    # Identify streams
-    streams = streams_to_stereo_encode(probe_streams)
+    # Identify streams, skip stereo creation if already present
+    if has_stereo_track(probe_streams):
+        logger.debug(f"File '{abspath}' already has a stereo track - skipping stereo creation")
+        streams = []
+    else:
+        streams = streams_to_stereo_encode(probe_streams)
+
     streams_2_aac_encode = streams_to_aac_encode(probe_streams, streams, keep_mc) if encode_all_2_aac else []
     all_astreams = [s['index'] for s in probe_streams if s['codec_type'] == 'audio']
 
