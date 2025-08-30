@@ -349,7 +349,7 @@ def stream_iterator(mapper, stream_list, streams, codec):
 
 def mapadder(mapper, stream, codec):
     """Add a stream to ffmpeg mapping while preserving original dispositions and preventing unintended default flags."""
-    mapper.stream_mapping += ['-map', f'0:{stream}']
+    mapper.stream_mapping += ['-map', f'0:{codec}:{stream}']  # <- keep codec specifier
 
     try:
         disp = mapper.probe_streams[stream].get('disposition', {})
@@ -363,11 +363,9 @@ def mapadder(mapper, stream, codec):
         flags.append('forced')
 
     # Subtitles: only set default if it was originally set
-    if codec == 's':
-        if 'default' not in flags:
-            flags.append('default-')
+    if codec == 's' and 'default' not in flags:
+        flags.append('default-')
 
-    # Audio: no special handling, keep dispositions
     if codec != 's' and not flags:
         flags.append('none')
 
