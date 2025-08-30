@@ -1,3 +1,6 @@
+**<span style="color:#56adda">0.0.8</span>**
+- Fixing error where it would add stereo tracks when they already exist.
+
 **<span style="color:#56adda">0.0.7</span>**
 - Fixed 'Stereo as default track' option.
 - Removed option to order tracks by language. 
