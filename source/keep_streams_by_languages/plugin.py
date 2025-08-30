@@ -69,6 +69,7 @@ class PluginStreamMapper(StreamMapper):
     def __init__(self):
         super(PluginStreamMapper, self).__init__(logger, ['audio','subtitle'])
         self.settings = None
+        self.probe_streams = []  # <-- Added to store streams for disposition info
 
     def set_settings(self, settings):
         self.settings = settings
@@ -350,8 +351,22 @@ def stream_iterator(mapper, stream_list, streams, codec):
                 mapadder(mapper, i, codec)
 
 def mapadder(mapper, stream, codec):
-    mapper.stream_mapping += ['-map', '0:{}:{}'.format(codec, stream)]
-    #mapper.stream_encoding += ['-c:{}:{}'.format(codec, stream), 'copy']
+    """Add a stream to the ffmpeg mapping while preserving dispositions."""
+    mapper.stream_mapping += ['-map', f'0:{codec}:{stream}']
+
+    # Preserve existing dispositions from probe streams
+    try:
+        disp = mapper.probe_streams[stream].get('disposition', {})
+    except Exception:
+        disp = {}
+
+    # Explicitly set common disposition flags
+    for flag in ['default', 'forced', 'dub', 'original']:
+        val = disp.get(flag, 0)
+        mapper.stream_encoding += [f'-disposition:{codec}:{stream}:{flag}', str(val)]
+
+    # Always copy the codec
+    mapper.stream_encoding += [f'-c:{codec}:{stream}', 'copy']
 
 def on_worker_process(data):
     """
