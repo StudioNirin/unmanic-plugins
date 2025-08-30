@@ -69,10 +69,15 @@ class PluginStreamMapper(StreamMapper):
     def __init__(self):
         super(PluginStreamMapper, self).__init__(logger, ['audio','subtitle'])
         self.settings = None
-        self.probe_streams = []  # <-- Added to store streams for disposition info
+        self.probe_streams = []  # <-- store streams for disposition info
 
     def set_settings(self, settings):
         self.settings = settings
+
+    def set_probe(self, probe):
+        super().set_probe(probe)
+        # Populate probe_streams with actual streams for disposition tracking
+        self.probe_streams = probe.get_probe()["streams"]
 
     def null_streams(self, streams):
         alcl, audio_streams_list = streams_list(self.settings.get_setting('audio_languages'), streams, 'audio')
@@ -85,12 +90,8 @@ class PluginStreamMapper(StreamMapper):
     def same_streams_or_no_work(self, streams, keep_undefined):
         alcl, audio_streams_list = streams_list(self.settings.get_setting('audio_languages'), streams, 'audio')
         slcl, subtitle_streams_list = streams_list(self.settings.get_setting('subtitle_languages'), streams, 'subtitle')
-#        if not audio_streams_list or not subtitle_streams_list:
-#            return False
         untagged_streams = [i for i in range(len(streams)) if "codec_type" in streams[i] and streams[i]["codec_type"] in ["audio", "subtitle"] and ("tags" not in streams[i] or ("tags" in streams[i] and "language" not in streams[i]["tags"]))]
 
-        # if subtitle or audio _streams_list is empty the "all" statements will not test properly so the if statements work around this
-        # and then we set the audio/subtitle_in a/slcl to True so no_work_to_do is properly determined.
         if subtitle_streams_list and slcl != ['*']:
             subs_in_slcl = all(l in slcl for l in subtitle_streams_list)
         else:
@@ -112,9 +113,7 @@ class PluginStreamMapper(StreamMapper):
 
     def test_tags_for_search_string(self, codec_type, stream_tags, stream_id):
         keep_undefined  = self.settings.get_setting('keep_undefined')
-        # TODO: Check if we need to add 'title' tags
         if stream_tags and True in list(k.lower() in ['language'] for k in stream_tags):
-            # check codec and get appropriate language list
             if codec_type == 'audio':
                 language_list = self.settings.get_setting('audio_languages')
             else:
@@ -152,11 +151,9 @@ class PluginStreamMapper(StreamMapper):
         return False
 
     def test_stream_needs_processing(self, stream_info: dict):
-        """Only add streams that have language task that match our list"""
         return self.test_tags_for_search_string(stream_info.get('codec_type', '').lower(), stream_info.get('tags'), stream_info.get('index'))
 
     def custom_stream_mapping(self, stream_info: dict, stream_id: int):
-        """Remove this stream"""
         return {
             'stream_mapping':  [],
             'stream_encoding': [],
@@ -365,16 +362,13 @@ def mapadder(mapper, stream, codec):
     if disp.get('forced', 0) == 1:
         flags.append('forced')
 
-    if flags:
-        # Combine flags with +
-        mapper.stream_encoding += [f'-disposition:{codec}:{stream}', '+'.join(flags)]
-    else:
-        # Explicitly set none to prevent ffmpeg auto-promoting
-        mapper.stream_encoding += [f'-disposition:{codec}:{stream}', 'none']
+    if not flags:
+        # Explicitly set 'none' if no disposition should be applied
+        flags = ['none']
 
+    mapper.stream_encoding += [f'-disposition:{codec}:{stream}', '+'.join(flags)]
     # Copy codec
     mapper.stream_encoding += [f'-c:{codec}:{stream}', 'copy']
-
 
 def on_worker_process(data):
     """
