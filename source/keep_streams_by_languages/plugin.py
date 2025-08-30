@@ -476,13 +476,12 @@ def on_postprocessor_task_results(data):
         settings = Settings(library_id=data.get('library_id'))
     else:
         settings = Settings()
-""" Skippping creating an .unmanic file
+
     # Loop over the destination_files list and update the directory info file for each one
     for destination_file in data.get('destination_files'):
         directory_info = UnmanicDirectoryInfo(os.path.dirname(destination_file))
         directory_info.set('keep_streams_by_languages', os.path.basename(destination_file), kept_streams(settings))
         directory_info.save()
-        logger.debug("Keep streams by language already processed for '{}'.".format(destination_file))
+        logger.debug("Keep streams by languages already processed for '{}'.".format(destination_file))
 
     return data
-"""
