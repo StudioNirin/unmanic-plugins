@@ -1,6 +1,7 @@
 {
     "author": "Nirin, Josh.5, SenorSmartyPants, yajrendrag",
     "compatibility": [
+        1,
         2
     ],
     "description": "Specify one audio stream and one subtitle stream to keep.",
