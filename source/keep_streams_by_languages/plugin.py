@@ -27,11 +27,12 @@ from configparser import NoSectionError, NoOptionError
 import iso639
 
 from unmanic.libs.unplugins.settings import PluginSettings
+from unmanic.libs.directoryinfo import UnmanicDirectoryInfo
 
 from keep_streams_by_languages.lib.ffmpeg import StreamMapper, Probe, Parser
 
 # Configure plugin logger
-logger = logging.getLogger("Unmanic.Plugin.keep_stream_by_language")
+logger = logging.getLogger("Unmanic.Plugin.keep_streams_by_languages")
 
 
 class Settings(PluginSettings):
