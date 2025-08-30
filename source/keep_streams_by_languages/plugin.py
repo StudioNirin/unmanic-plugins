@@ -351,7 +351,7 @@ def stream_iterator(mapper, stream_list, streams, codec):
                 mapadder(mapper, i, codec)
 
 def mapadder(mapper, stream, codec):
-    """Add a stream to ffmpeg mapping while preserving forced/default exactly."""
+    """Add a stream to ffmpeg mapping while preserving all original dispositions."""
     mapper.stream_mapping += ['-map', f'0:{codec}:{stream}']
 
     try:
@@ -359,18 +359,22 @@ def mapadder(mapper, stream, codec):
     except Exception:
         disp = {}
 
-    # Set default/forced exactly as in the original
+    flags = []
     if disp.get('default', 0) == 1:
-        mapper.stream_encoding += [f'-disposition:{codec}:{stream}', 'default']
+        flags.append('default')
+    if disp.get('forced', 0) == 1:
+        flags.append('forced')
+
+    if flags:
+        # Combine flags with +
+        mapper.stream_encoding += [f'-disposition:{codec}:{stream}', '+'.join(flags)]
     else:
-        # Explicitly clear default to prevent ffmpeg auto-promoting
+        # Explicitly set none to prevent ffmpeg auto-promoting
         mapper.stream_encoding += [f'-disposition:{codec}:{stream}', 'none']
 
-    if disp.get('forced', 0) == 1:
-        mapper.stream_encoding += [f'-disposition:{codec}:{stream}', 'forced']
-
-    # Copy codec once
+    # Copy codec
     mapper.stream_encoding += [f'-c:{codec}:{stream}', 'copy']
+
 
 def on_worker_process(data):
     """
