@@ -351,26 +351,22 @@ def stream_iterator(mapper, stream_list, streams, codec):
                 mapadder(mapper, i, codec)
 
 def mapadder(mapper, stream, codec):
-    """Add a stream to the ffmpeg mapping while preserving dispositions."""
+    """Add a stream to the ffmpeg mapping while preserving original dispositions."""
     mapper.stream_mapping += ['-map', f'0:{codec}:{stream}']
 
-    # Preserve existing dispositions from probe streams
     try:
         disp = mapper.probe_streams[stream].get('disposition', {})
     except Exception:
         disp = {}
 
-    # Only 'default' and 'forced' are usually important for subtitles/audio
+    # Only set flags if they were originally 1
     for flag in ['default', 'forced']:
         if disp.get(flag, 0) == 1:
             mapper.stream_encoding += [f'-disposition:{codec}:{stream}', flag]
-        else:
-            # Explicitly clear if it was 0
-            mapper.stream_encoding += [f'-disposition:{codec}:{stream}', 'none']
+    # Do not set 'none' for flags that were originally 0 — this prevents ffmpeg from auto-promoting first stream
 
-    # Add codec copy once per stream
+    # Copy the codec
     mapper.stream_encoding += [f'-c:{codec}:{stream}', 'copy']
-
 
 def on_worker_process(data):
     """
