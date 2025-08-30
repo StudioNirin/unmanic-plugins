@@ -25,7 +25,6 @@ import logging
 import os
 
 from unmanic.libs.unplugins.settings import PluginSettings
-
 from convert_multichan_audio_to_stereo.lib.ffmpeg import Probe, Parser
 
 # Configure plugin logger
@@ -33,11 +32,14 @@ logger = logging.getLogger("Unmanic.Plugin.convert_multichan_audio_to_stereo")
 
 
 def has_stereo_track(probe_streams):
-    """Return True if any existing stereo audio track is present."""
-    return any(
-        s['codec_type'] == 'audio' and s.get('channels', 0) == 2
-        for s in probe_streams
-    )
+    """Return True if any existing stereo audio track is present (excluding commentary tracks)."""
+    for s in probe_streams:
+        if s['codec_type'] != 'audio' or s.get('channels', 0) != 2:
+            continue
+        title = s.get('tags', {}).get('title', '')
+        if 'commentary' not in title.lower():
+            return True
+    return False
 
 
 class Settings(PluginSettings):
@@ -161,30 +163,25 @@ def on_library_management_file_test(data):
         data['add_file_to_pending_tasks'] = False
         return data
 
-    if data.get('library_id'):
-        settings = Settings(library_id=data.get('library_id'))
-    else:
-        settings = Settings()
+    settings = Settings(library_id=data.get('library_id')) if data.get('library_id') else Settings()
 
     # Early exit if stereo already exists
     if has_stereo_track(probe_streams):
-        logger.debug(f"File '{abspath}' already has a stereo track - only re-encode to AAC if required.")
+        logger.debug(f"File '{abspath}' already has a stereo track (non-commentary) - skipping stereo creation.")
         streams = []
     else:
         streams = streams_to_stereo_encode(probe_streams)
 
     encode_all_2_aac = settings.get_setting('encode_all_2_aac')
     keep_mc = settings.get_setting('keep_mc')
-    streams_2_aac_encode = []
-    if encode_all_2_aac:
-        streams_2_aac_encode = streams_to_aac_encode(probe_streams, streams, keep_mc)
+    streams_2_aac_encode = streams_to_aac_encode(probe_streams, streams, keep_mc) if encode_all_2_aac else []
 
     if streams or streams_2_aac_encode:
         data['add_file_to_pending_tasks'] = True
         for stream in streams:
-            logger.debug("Audio stream '{}' is multichannel audio - convert stream".format(stream))
+            logger.debug(f"Audio stream '{stream}' is multichannel audio - convert stream")
     else:
-        logger.debug("do not add file '{}' to task list - no multichannel audio streams".format(abspath))
+        logger.debug(f"do not add file '{abspath}' to task list - no multichannel audio streams")
 
     return data
 
@@ -217,20 +214,16 @@ def on_worker_process(data):
     encode_all_2_aac = settings.get_setting('encode_all_2_aac')
     normalize_2_channel_stream = settings.get_setting('normalize_2_channel_stream')
     encoder = 'libfdk_aac' if settings.get_setting('use_libfdk_aac') else 'aac'
-    copy_enc = encoder if encode_all_2_aac else 'copy'
 
     # Identify streams, skip stereo creation if already present
     if has_stereo_track(probe_streams):
-        logger.debug(f"File '{abspath}' already has a stereo track - skipping stereo creation")
+        logger.debug(f"File '{abspath}' already has a stereo track (non-commentary) - skipping stereo creation")
         streams = []
     else:
         streams = streams_to_stereo_encode(probe_streams)
 
     streams_2_aac_encode = streams_to_aac_encode(probe_streams, streams, keep_mc) if encode_all_2_aac else []
     all_astreams = [s['index'] for s in probe_streams if s['codec_type'] == 'audio']
-
-    logger.debug(f"streams to downmix: {streams}")
-    logger.debug(f"all audio streams: {all_astreams}")
 
     if not streams and not streams_2_aac_encode:
         logger.debug(f"do not add file '{abspath}' to task list - no multichannel audio streams")
@@ -261,7 +254,6 @@ def on_worker_process(data):
         for disp_key, disp_val in existing_dispositions[abs_stream].items():
             if disp_val:
                 if defaudio2ch and disp_key == 'default':
-                    # strip default from originals
                     ffmpeg_args += [f'-disposition:a:{next_audio_stream_index}', '0']
                 else:
                     ffmpeg_args += [f'-disposition:a:{next_audio_stream_index}', disp_key]
@@ -295,7 +287,7 @@ def on_worker_process(data):
 
             next_audio_stream_index += 1
 
-    # Encode any extra 2ch tracks if requested
+    # Encode any extra 2ch streams if requested
     for abs_stream in streams_2_aac_encode:
         if abs_stream in streams:
             continue
