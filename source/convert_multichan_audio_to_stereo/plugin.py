@@ -5,7 +5,22 @@
     plugins.__init__.py
 
     Written by:               Josh.5 <jsunnex@gmail.com>
-    Modified by:              ChatGPT (fix AAC re-encode behaviour)
+    Modified by:              Nirin. 
+    Date:                     30 Sep 2021, (03:45 PM)
+
+    Copyright:
+        Copyright (C) 2021 Josh Sunnex
+
+        This program is free software: you can redistribute it and/or modify it under the terms of the GNU General
+        Public License as published by the Free Software Foundation, version 3.
+
+        This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the
+        implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License
+        for more details.
+
+        You should have received a copy of the GNU General Public License along with this program.
+        If not, see <https://www.gnu.org/licenses/>.
+
 """
 
 import logging
@@ -264,13 +279,30 @@ def on_worker_process(data):
 
             next_audio_stream_index += 1
 
-    # Map subtitles/data/attachments
-    ffmpeg_args += [
-        '-map', '0:s?', '-c:s', 'copy',
-        '-map', '0:d?', '-c:d', 'copy',
-        '-map', '0:t?', '-c:t', 'copy',
-        '-y', str(outpath)
-    ]
+    # Map subtitles/data/attachments and restore dispositions
+    subtitle_streams = [s for s in probe_streams if s['codec_type'] == 'subtitle']
+    data_streams = [s for s in probe_streams if s['codec_type'] == 'data']
+    attachment_streams = [s for s in probe_streams if s['codec_type'] == 'attachment']
+
+    ffmpeg_args += ['-map', '0:s?', '-c:s', 'copy']
+    for i, s in enumerate(subtitle_streams):
+        for disp_key, disp_val in existing_dispositions[s['index']].items():
+            if disp_val:
+                ffmpeg_args += [f'-disposition:s:{i}', disp_key]
+
+    ffmpeg_args += ['-map', '0:d?', '-c:d', 'copy']
+    for i, s in enumerate(data_streams):
+        for disp_key, disp_val in existing_dispositions[s['index']].items():
+            if disp_val:
+                ffmpeg_args += [f'-disposition:d:{i}', disp_key]
+
+    ffmpeg_args += ['-map', '0:t?', '-c:t', 'copy']
+    for i, s in enumerate(attachment_streams):
+        for disp_key, disp_val in existing_dispositions[s['index']].items():
+            if disp_val:
+                ffmpeg_args += [f'-disposition:t:{i}', disp_key]
+
+    ffmpeg_args += ['-y', str(outpath)]
 
     logger.debug(f"ffmpeg args: '{ffmpeg_args}'")
 
