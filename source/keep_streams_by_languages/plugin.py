@@ -360,13 +360,17 @@ def mapadder(mapper, stream, codec):
     except Exception:
         disp = {}
 
-    # Explicitly set common disposition flags
-    for flag in ['default', 'forced', 'dub', 'original']:
-        val = disp.get(flag, 0)
-        mapper.stream_encoding += [f'-disposition:{codec}:{stream}:{flag}', str(val)]
+    # Only 'default' and 'forced' are usually important for subtitles/audio
+    for flag in ['default', 'forced']:
+        if disp.get(flag, 0) == 1:
+            mapper.stream_encoding += [f'-disposition:{codec}:{stream}', flag]
+        else:
+            # Explicitly clear if it was 0
+            mapper.stream_encoding += [f'-disposition:{codec}:{stream}', 'none']
 
-    # Always copy the codec
+    # Add codec copy once per stream
     mapper.stream_encoding += [f'-c:{codec}:{stream}', 'copy']
+
 
 def on_worker_process(data):
     """
