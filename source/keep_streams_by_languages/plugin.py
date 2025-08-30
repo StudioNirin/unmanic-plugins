@@ -348,9 +348,10 @@ def stream_iterator(mapper, stream_list, streams, codec):
                 mapadder(mapper, i, codec)
 
 def mapadder(mapper, stream, codec):
-    """Add a stream to ffmpeg mapping while preserving all original dispositions."""
+    """Add a stream to ffmpeg mapping while preserving all original dispositions and preventing unwanted default flags."""
     mapper.stream_mapping += ['-map', f'0:{codec}:{stream}']
 
+    # Get original disposition from probe
     try:
         disp = mapper.probe_streams[stream].get('disposition', {})
     except Exception:
@@ -362,13 +363,24 @@ def mapadder(mapper, stream, codec):
     if disp.get('forced', 0) == 1:
         flags.append('forced')
 
-    if not flags:
-        # Explicitly set 'none' if no disposition should be applied
-        flags = ['none']
+    # Special handling for subtitles: prevent FFmpeg auto-promotion
+    if codec == 's':
+        if not flags:
+            # Explicitly remove default and forced
+            flags.append('default-')
+        # if only forced is set, make sure default is removed
+        if 'forced' in flags and 'default' not in flags:
+            flags.append('default-')
+
+    # For audio, set 'none' if no disposition is needed
+    if codec != 's' and not flags:
+        flags.append('none')
 
     mapper.stream_encoding += [f'-disposition:{codec}:{stream}', '+'.join(flags)]
+
     # Copy codec
     mapper.stream_encoding += [f'-c:{codec}:{stream}', 'copy']
+
 
 def on_worker_process(data):
     """
