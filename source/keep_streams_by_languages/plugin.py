@@ -357,20 +357,17 @@ def mapadder(mapper, stream_index, codec, streams):
     # Always map the stream
     mapper.stream_mapping += ['-map', f'0:{codec}:{stream_index}']
 
+    # Start by explicitly clearing all dispositions
+    mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', '0']
+
     # Preserve dispositions from input file
     disposition = streams[stream_index].get('disposition', {})
-    if disposition:
-        active_flags = [k for k, v in disposition.items() if v == 1]
-        if active_flags:
-            # Join active flags into ffmpeg syntax (e.g. default+forced)
-            disp_str = "+".join(active_flags)
-            mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', disp_str]
-        else:
-            # Explicitly clear disposition if none were set
-            mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', '0']
-    else:
-        # No disposition dict at all → explicitly clear
-        mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', '0']
+    active_flags = [k for k, v in disposition.items() if v == 1]
+
+    if active_flags:
+        # Join active flags into ffmpeg syntax (e.g. default+forced)
+        disp_str = "+".join(active_flags)
+        mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', disp_str]
 
 
 def on_worker_process(data):
