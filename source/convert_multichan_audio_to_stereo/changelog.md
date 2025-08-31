@@ -1,3 +1,7 @@
+**<span style="color:#56adda">0.1.0</span>**
+- Fixed error with encoding non-aac tracks to aac.
+- All features finally work as they should... so bumped it up to 1.0 in celebration!
+
 **<span style="color:#56adda">0.0.9</span>**
 - Fixing error where it would add stereo tracks when they already exist.
 - Altering default position in stacks to 1 (recommend removal of extra language tracks etc is done first). 
