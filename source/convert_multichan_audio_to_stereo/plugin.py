@@ -203,7 +203,6 @@ def on_worker_process(data):
     encoder = 'libfdk_aac' if settings.get_setting('use_libfdk_aac') else 'aac'
 
     stereo_exists = has_stereo_track(probe_streams)
-
     all_astreams = [s['index'] for s in probe_streams if s['codec_type'] == 'audio']
 
     if not all_astreams:
@@ -231,9 +230,10 @@ def on_worker_process(data):
         ffmpeg_args += ['-map', f'0:{abs_stream}']
 
         if must_reencode:
-            rate = '128k'
-            if 'bit_rate' in s:
-                rate = str(int(int(s['bit_rate']) / (1000 * max(chnls, 1))) * 2) + 'k'
+            # New bitrate calculation: 64 kbps per channel
+            per_channel_bitrate = 64000
+            total_bitrate = per_channel_bitrate * chnls
+            rate = f"{total_bitrate // 1000}k"
 
             ffmpeg_args += [
                 f'-c:a:{next_audio_stream_index}', encoder,
@@ -255,10 +255,8 @@ def on_worker_process(data):
 
         # Add stereo downmix only if no stereo already exists
         if not stereo_exists and chnls > 2:
-            rate = '128k'
-            if 'bit_rate' in s:
-                rate = str(int(int(s['bit_rate']) / (1000 * max(chnls, 1))) * 2) + 'k'
-
+            # Stereo downmix bitrate: 64 kbps per channel × 2
+            stereo_bitrate = 64000 * 2
             filter_args = []
             if normalize_2_channel_stream:
                 filter_args = [f"-filter:a:{next_audio_stream_index}", audio_filtergraph(settings)]
@@ -270,7 +268,7 @@ def on_worker_process(data):
                 '-map', f'0:{abs_stream}',
                 f'-c:a:{next_audio_stream_index}', encoder,
                 f'-ac:a:{next_audio_stream_index}', '2',
-                f'-b:a:{next_audio_stream_index}', rate,
+                f'-b:a:{next_audio_stream_index}', f"{stereo_bitrate // 1000}k",
                 f'-metadata:s:a:{next_audio_stream_index}', f"title={new_title}"
             ] + filter_args
 
@@ -312,3 +310,5 @@ def on_worker_process(data):
     data['command_progress_parser'] = parser.parse_progress
 
     return data
+
+
