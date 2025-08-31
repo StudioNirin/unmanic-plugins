@@ -357,19 +357,16 @@ def mapadder(mapper, stream_index, codec, streams):
     # Always map the stream
     mapper.stream_mapping += ['-map', f'0:{codec}:{stream_index}']
 
-    # Get original dispositions dict (may be empty)
-    disposition = streams[stream_index].get('disposition', {})
+    # Step 1: Force-clear any ffmpeg automatic disposition
+    mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', '0']
 
-    # Collect all flags that were actually set in the source
+    # Step 2: Reapply exactly what was in the source
+    disposition = streams[stream_index].get('disposition', {})
     active_flags = [k for k, v in disposition.items() if v == 1]
 
     if active_flags:
-        # Join them into one ffmpeg disposition string (e.g. "forced+hearing_impaired")
         disp_str = "+".join(active_flags)
         mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', disp_str]
-    else:
-        # Explicitly clear so ffmpeg doesn't invent "default"
-        mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', '0']
 
 def on_worker_process(data):
     """
