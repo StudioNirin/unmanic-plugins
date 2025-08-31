@@ -351,6 +351,7 @@ def stream_iterator(mapper, stream_list, streams, codec):
             if lang == 'und':
                 logger.debug("keeping stream '{}' marked as undefined.".format(i))
                 mapadder(mapper, i, codec, streams)
+
                 
 def mapadder(mapper, stream_index, codec, streams):
     # Always map the stream
@@ -367,6 +368,10 @@ def mapadder(mapper, stream_index, codec, streams):
         else:
             # Explicitly clear disposition if none were set
             mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', '0']
+    else:
+        # No disposition dict at all → explicitly clear
+        mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', '0']
+
 
 def on_worker_process(data):
     """
