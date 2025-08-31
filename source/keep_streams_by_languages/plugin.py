@@ -300,19 +300,21 @@ def on_library_management_file_test(data):
 def keep_languages(mapper, ct, language_list, streams, keep_undefined, keep_commentary):
     codec_type = ct[0].lower()
     languages = list(filter(None, language_list.split(',')))
-    languages = [languages[i].lower().strip() for i in range(0,len(languages))]
+    languages = [languages[i].lower().strip() for i in range(0, len(languages))]
+
     if '*' not in languages and languages:
         try:
             languages = [iso639.Language.match(languages[i]).part1 if iso639.Language.match(languages[i]).part1 is not None and languages[i] in iso639.Language.match(languages[i]).part1 else
                          iso639.Language.match(languages[i]).part2b if iso639.Language.match(languages[i]).part2b is not None and languages[i] in iso639.Language.match(languages[i]).part2b else
                          iso639.Language.match(languages[i]).part2t if iso639.Language.match(languages[i]).part2t is not None and languages[i] in iso639.Language.match(languages[i]).part2t else
                          iso639.Language.match(languages[i]).part3 if languages[i] in iso639.Language.match(languages[i]).part3 else "" for i in range(len(languages))]
-
         except iso639.language.LanguageNotFoundError:
             raise iso639.language.LanguageNotFoundError("config list: ", languages)
+
     streams_list = [streams[i]["tags"]["language"] for i in range(0, len(streams)) if "codec_type" in streams[i] and streams[i]["codec_type"] == ct and "tags" in streams[i] and "language" in streams[i]["tags"] and
                     (codec_type == 's' or keep_commentary == True or (keep_commentary == False and ("codec_type" in streams[i] and streams[i]["codec_type"] == ct and "tags" in streams[i] and ("title" in streams[i]["tags"] and
                      "commentary" not in streams[i]["tags"]["title"].lower() or "title" not in streams[i]["tags"]))) or languages == ['*'])]
+
     try:
         streams_list = [iso639.Language.match(streams_list[i]).part1 if iso639.Language.match(streams_list[i]).part1 is not None and streams_list[i] in iso639.Language.match(streams_list[i]).part1 else
                         iso639.Language.match(streams_list[i]).part2b if iso639.Language.match(streams_list[i]).part2b is not None and streams_list[i] in iso639.Language.match(streams_list[i]).part2b else
@@ -320,12 +322,13 @@ def keep_languages(mapper, ct, language_list, streams, keep_undefined, keep_comm
                         iso639.Language.match(streams_list[i]).part3 if streams_list[i] in iso639.Language.match(streams_list[i]).part3 else "" for i in range(len(streams_list))]
     except iso639.language.LanguageNotFoundError:
         raise iso639.language.LanguageNotFoundError("streams language list: ", streams_list)
+
     if streams_list:
         for i, language in enumerate(streams_list):
             lang = language.lower().strip()
             if lang and not (keep_undefined and lang == "und") and (lang in languages or languages == ['*']):
-                logger.debug("keeping language '{}' from '{}' stream '{}.".format(lang, ct, i))
-                mapadder(mapper, i, codec_type)
+                logger.debug("keeping language '{}' from '{}' stream '{}'.".format(lang, ct, i))
+                mapadder(mapper, i, codec_type, streams)
 
 def keep_undefined(mapper, streams, keep_commentary):
     if keep_commentary:
@@ -342,16 +345,28 @@ def stream_iterator(mapper, stream_list, streams, codec):
         try:
             lang = streams[stream_list[i]]["tags"]["language"].lower().strip()
         except KeyError:
-            logger.debug("keeping untagged stream '{}.".format(i))
-            mapadder(mapper, i, codec)
+            logger.debug("keeping untagged stream '{}'.".format(i))
+            mapadder(mapper, i, codec, streams)
         else:
             if lang == 'und':
                 logger.debug("keeping stream '{}' marked as undefined.".format(i))
-                mapadder(mapper, i, codec)
+                mapadder(mapper, i, codec, streams)
+                
+def mapadder(mapper, stream_index, codec, streams):
+    # Always map the stream
+    mapper.stream_mapping += ['-map', f'0:{codec}:{stream_index}']
 
-def mapadder(mapper, stream, codec):
-    mapper.stream_mapping += ['-map', '0:{}:{}'.format(codec, stream)]
-    #mapper.stream_encoding += ['-c:{}:{}'.format(codec, stream), 'copy']
+    # Preserve dispositions from input file
+    disposition = streams[stream_index].get('disposition', {})
+    if disposition:
+        active_flags = [k for k, v in disposition.items() if v == 1]
+        if active_flags:
+            # Join active flags into ffmpeg syntax (e.g. default+forced)
+            disp_str = "+".join(active_flags)
+            mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', disp_str]
+        else:
+            # Explicitly clear disposition if none were set
+            mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', '0']
 
 def on_worker_process(data):
     """
