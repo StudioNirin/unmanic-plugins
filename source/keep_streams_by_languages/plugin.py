@@ -357,24 +357,19 @@ def mapadder(mapper, stream_index, codec, streams):
     # Always map the stream
     mapper.stream_mapping += ['-map', f'0:{codec}:{stream_index}']
 
-    # Start by clearing disposition (so ffmpeg can't auto-assign default)
-    mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', '0']
-
-    # Get original dispositions
+    # Get original dispositions dict (may be empty)
     disposition = streams[stream_index].get('disposition', {})
+
+    # Collect all flags that were actually set in the source
     active_flags = [k for k, v in disposition.items() if v == 1]
 
-    # If multiple flags exist, handle default separately
-    if "default" in active_flags:
-        # Make sure only this stream gets default for its codec type
-        mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', "default"]
-        active_flags.remove("default")
-
-    # Reapply any remaining flags (forced, hearing_impaired, etc.)
     if active_flags:
+        # Join them into one ffmpeg disposition string (e.g. "forced+hearing_impaired")
         disp_str = "+".join(active_flags)
         mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', disp_str]
-
+    else:
+        # Explicitly clear so ffmpeg doesn't invent "default"
+        mapper.stream_encoding += [f'-disposition:{codec}:{stream_index}', '0']
 
 def on_worker_process(data):
     """
