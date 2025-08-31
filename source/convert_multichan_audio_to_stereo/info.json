@@ -12,8 +12,8 @@
     ],
     "priorities": {
         "on_library_management_file_test": 99,
-        "on_worker_process": 0
+        "on_worker_process": 1
     },
     "tags": "audio,encoder,ffmpeg,library file test",
-    "version": "0.0.8g"
+    "version": "0.0.9"
 }
