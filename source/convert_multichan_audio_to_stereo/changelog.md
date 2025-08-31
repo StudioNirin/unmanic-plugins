@@ -1,5 +1,6 @@
-**<span style="color:#56adda">0.0.8</span>**
+**<span style="color:#56adda">0.0.9</span>**
 - Fixing error where it would add stereo tracks when they already exist.
+- Altering default position in stacks to 1 (recommend removal of extra language tracks etc is done first). 
 
 **<span style="color:#56adda">0.0.7</span>**
 - Fixed 'Stereo as default track' option.
