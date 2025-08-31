@@ -219,6 +219,7 @@ def on_worker_process(data):
     ]
 
     next_audio_stream_index = 0
+    sample_rate = 48000  # enforce 48 kHz for all re-encoded/new streams
 
     for abs_stream in all_astreams:
         s = probe_streams[abs_stream]
@@ -230,15 +231,13 @@ def on_worker_process(data):
         ffmpeg_args += ['-map', f'0:{abs_stream}']
 
         if must_reencode:
-            # New bitrate calculation: 64 kbps per channel
-            per_channel_bitrate = 64000
-            total_bitrate = per_channel_bitrate * chnls
-            rate = f"{total_bitrate // 1000}k"
-
+            # Bitrate calculation: 64 kbps per channel
+            total_bitrate = 64000 * chnls
             ffmpeg_args += [
                 f'-c:a:{next_audio_stream_index}', encoder,
                 f'-ac:a:{next_audio_stream_index}', str(chnls),
-                f'-b:a:{next_audio_stream_index}', rate
+                f'-ar:a:{next_audio_stream_index}', str(sample_rate),
+                f'-b:a:{next_audio_stream_index}', f"{total_bitrate // 1000}k"
             ]
         else:
             ffmpeg_args += [f'-c:a:{next_audio_stream_index}', 'copy']
@@ -255,8 +254,7 @@ def on_worker_process(data):
 
         # Add stereo downmix only if no stereo already exists
         if not stereo_exists and chnls > 2:
-            # Stereo downmix bitrate: 64 kbps per channel × 2
-            stereo_bitrate = 64000 * 2
+            total_bitrate = 64000 * 2  # 64 kbps per channel × 2 channels
             filter_args = []
             if normalize_2_channel_stream:
                 filter_args = [f"-filter:a:{next_audio_stream_index}", audio_filtergraph(settings)]
@@ -268,7 +266,8 @@ def on_worker_process(data):
                 '-map', f'0:{abs_stream}',
                 f'-c:a:{next_audio_stream_index}', encoder,
                 f'-ac:a:{next_audio_stream_index}', '2',
-                f'-b:a:{next_audio_stream_index}', f"{stereo_bitrate // 1000}k",
+                f'-ar:a:{next_audio_stream_index}', str(sample_rate),
+                f'-b:a:{next_audio_stream_index}', f"{total_bitrate // 1000}k",
                 f'-metadata:s:a:{next_audio_stream_index}', f"title={new_title}"
             ] + filter_args
 
@@ -310,5 +309,6 @@ def on_worker_process(data):
     data['command_progress_parser'] = parser.parse_progress
 
     return data
+
 
 
