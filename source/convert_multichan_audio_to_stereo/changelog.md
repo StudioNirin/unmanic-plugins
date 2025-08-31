@@ -1,5 +1,6 @@
 **<span style="color:#56adda">0.1.0</span>**
 - Fixed error with encoding non-aac tracks to aac.
+- Fixed sample rate to 48khz for all audio tracks encoded by this plugin
 - All features finally work as they should... so bumped it up to 1.0 in celebration!
 
 **<span style="color:#56adda">0.0.9</span>**
