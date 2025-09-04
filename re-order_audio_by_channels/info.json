@@ -1,0 +1,15 @@
+{
+    "author": "Nirin",
+    "compatibility": [
+        2
+    ],
+    "description": "Change audio tracks to descending channels order.",
+    "icon": "https://raw.githubusercontent.com/Josh5/unmanic.plugin.reorder_audio_streams_by_language/master/icon.png",
+    "id": "re-order_audio_by_channels",
+    "name": "Re-order Audio by Channels",
+    "priorities": {
+        "on_worker_process": 0
+    },
+    "tags": "",
+    "version": "0.0.2"
+}

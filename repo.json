@@ -1,0 +1,100 @@
+{
+    "repo": {
+        "id": "repository.studionirin",
+        "name": "Nirin's Unmanic Repo",
+        "icon": "https://avatars.githubusercontent.com/u/3751273?s=400&v=4",
+        "repo_data_directory": "https://raw.githubusercontent.com/StudioNirin/unmanic-plugins/repo/",
+        "repo_data_url": "https://raw.githubusercontent.com/StudioNirin/unmanic-plugins/repo/repo.json"
+    },
+    "plugins": [
+        {
+            "author": "Nirin",
+            "compatibility": [
+                2
+            ],
+            "description": "Change audio tracks to descending channels order.",
+            "icon": "https://raw.githubusercontent.com/Josh5/unmanic.plugin.reorder_audio_streams_by_language/master/icon.png",
+            "id": "re-order_audio_by_channels",
+            "name": "Re-order Audio by Channels",
+            "priorities": {
+                "on_worker_process": 0
+            },
+            "tags": "",
+            "version": "0.0.2"
+        },
+        {
+            "author": "Nirin, Josh.5, yajrendrag",
+            "compatibility": [
+                1,
+                2
+            ],
+            "description": "Specify one audio stream and one subtitle stream to keep.",
+            "icon": "https://raw.githubusercontent.com/Unmanic/plugin.remove_stream_by_language/master/icon.png",
+            "id": "keep_streams_by_languages",
+            "name": "Keep streams by languages",
+            "platform": [
+                "all"
+            ],
+            "priorities": {
+                "on_library_management_file_test": 0,
+                "on_worker_process": 0
+            },
+            "tags": "audio,subtitle, ffmpeg,library file test",
+            "version": "0.0.3"
+        },
+        {
+            "author": "Nirin, Josh.5, EspadaV8",
+            "compatibility": [
+                1,
+                2
+            ],
+            "description": "Aggregate changes in file size metrics for processed files and add a data panel for displaying the results.",
+            "icon": "https://raw.githubusercontent.com/Unmanic/plugin.file_size_metrics/master/icon.png",
+            "id": "file_size_metrics2",
+            "name": "File Size Metrics Data Panel v2",
+            "platform": [
+                "all"
+            ],
+            "priorities": {
+                "on_postprocessor_task_results": 0
+            },
+            "tags": "data panel",
+            "version": "0.0.1"
+        },
+        {
+            "author": "Nirin + Yajrendrag",
+            "compatibility": [
+                2
+            ],
+            "description": "Creates stereo audio streams from existing multi-channel audio streams",
+            "icon": "https://raw.githubusercontent.com/Unmanic/plugin.encoder_audio_aac/master/icon.png",
+            "id": "convert_multichan_audio_to_stereo",
+            "name": "Convert multichannel audio to stereo.",
+            "platform": [
+                "all"
+            ],
+            "priorities": {
+                "on_library_management_file_test": 99,
+                "on_worker_process": 1
+            },
+            "tags": "audio,encoder,ffmpeg,library file test",
+            "version": "0.1.0"
+        },
+        {
+            "author": "Nirin, Josh.5",
+            "compatibility": [
+                2
+            ],
+            "description": "Transcode the video streams of a video file",
+            "icon": "https://raw.githubusercontent.com/Unmanic/plugin.video_transcoder/master/icon.png",
+            "id": "video-transcoder-plus",
+            "name": "Transcode Video Files Plus",
+            "priorities": {
+                "on_library_management_file_test": 10,
+                "on_worker_process": 1
+            },
+            "tags": "video,ffmpeg",
+            "version": "0.0.3"
+        }
+    ]
+}
